@@ -1,3 +1,30 @@
+index="personnes-$(date '+%G-w%V')"
+
+while IFS= read -r ligne || [[ -n "$ligne" ]]; do
+    ligne="${ligne%$'\r'}"
+    [[ -z "$ligne" ]] && continue
+
+    uid=$(printf '%s' "$ligne" | sha256sum | cut -d ' ' -f 1)
+
+    IFS=';' read -r nom ville age <<< "$ligne"
+
+    document=$(jq -cn \
+        --arg nom "$nom" \
+        --arg ville "$ville" \
+        --arg age "$age" \
+        '{nom: $nom, ville: $ville, age: $age}') || break
+
+    curl -fsS -X PUT "$ES_URL/$index/_doc/$uid" \
+        -H "Content-Type: application/json" \
+        --data-binary "$document" || break
+
+    printf '\n'
+done < <(tail -n +2 donnees.csv)
+
+
+
+
+
 PUT _cluster/settings
 {
   "persistent": {
