@@ -1,3 +1,6 @@
+https://download.bell-sw.com/java/17.0.12+10/bellsoft-jre17.0.12+10-linux-amd64-full.tar.gz
+
+
 index="personnes-$(date '+%G-w%V')"
 
 while IFS= read -r ligne || [[ -n "$ligne" ]]; do
