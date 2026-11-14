@@ -1,6 +1,78 @@
+
+
+
+ FS=$(findmnt -rn -o TARGET -t ext2,ext3,ext4,xfs,btrfs); echo "$FS"
+
+
+=== 1. Vérifier l'état de départ
+
+id elasticsearch; getent group sssd; getent group 994; getent passwd 994; getent group 499
+
+-> continuer seulement si :
+   - elasticsearch en 990:990
+   - getent group 994 renvoie sssd
+   - getent passwd 994 et getent group 499 ne renvoient RIEN
+
+
+=== 2.  arrêter Elasticsearch
+
+
+systemctl stop elasticsearch
+
+
+=== 3. Libérer le GID 994 (groupe sssd)
+
+NEW=$(for i in $(seq 999 -1 201); do [ "$i" = 994 ] || [ "$i" = 499 ] || getent group "$i" >/dev/null || { echo "$i"; break; }; done); echo "nouveau GID sssd : $NEW"
+
+systemctl stop sssd
+
+groupmod -g "$NEW" sssd
+
+for m in $FS; do find "$m" -xdev -gid 994 -exec chgrp -h "$NEW" {} +; done
+
+systemctl start sssd; systemctl is-active sssd
+
+
+=== 4. Passer elasticsearch en 994:499
+
+groupmod -g 499 elasticsearch
+
+usermod -u 994 elasticsearch
+
+for m in $FS; do find "$m" -xdev -uid 990 -exec chown -h 994 {} +; find "$m" -xdev -gid 990 -exec chgrp -h 499 {} +; done
+
+-> durée selon le volume de /storage/elasticsearch
+
+
+=== 5. Vérifier avant de redémarrer
+
+id elasticsearch; getent group sssd; ls -ln /storage/elasticsearch /etc/elasticsearch
+
+find /storage/elasticsearch /var/log/elasticsearch ! -uid 994 2>/dev/null | head
+
+find /storage/elasticsearch /var/log/elasticsearch ! -gid 499 2>/dev/null | head
+
+id <ton_login_ipa>
+
+-> attendu :
+   - elasticsearch en uid=994 gid=499
+   - sssd sur $NEW
+   - fichiers en 994 499 (ceux de /etc/elasticsearch en 0 499)
+   - les deux find ne renvoient rien
+   - le compte FreeIPA est résolu
+
+
+=== 6. Redémarrer et 
+systemctl start elasticsearch
+
+
+
+
+
+
+
+
 https://download.bell-sw.com/java/17.0.12+10/bellsoft-jre17.0.12+10-linux-amd64-full.tar.gz
-
-
 index="personnes-$(date '+%G-w%V')"
 
 while IFS= read -r ligne || [[ -n "$ligne" ]]; do
