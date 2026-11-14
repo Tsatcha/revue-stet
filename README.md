@@ -1,5 +1,66 @@
 
 
+1. Vérifier le cluster et les exclusions existantes — Kibana Dev Tools :
+GET _cat/nodes?v&h=name,ip,node.role
+
+GET _cluster/settings?flat_settings=true
+
+GET _cluster/health
+
+2. Exclure data-03 de l’allocation :
+
+Conserve les autres noms si une exclusion existe déjà.
+PUT _cluster/settings
+{
+  "persistent": {
+    "cluster.routing.allocation.exclude._name": "data-03"
+  }
+}
+
+3. Suivre le déplacement des shards :
+GET _cat/allocation?v&h=node,shards,disk.percent,disk.avail
+
+GET _cat/shards?v&h=index,shard,prirep,state,node&s=node
+
+GET _cluster/health
+
+Continuer uniquement lorsque data-03 n’héberge plus aucun shard et que le cluster est green.
+
+Si le déplacement bloque :
+GET _cluster/allocation/explain?include_disk_info=true
+
+4. Arrêter Elasticsearch sur le serveur data-03 :
+sudo systemctl stop elasticsearch
+sudo systemctl is-active elasticsearch
+# Attendu : inactive
+
+Effectuer la maintenance.
+
+5. Redémarrer Elasticsearch sur data-03 :
+sudo systemctl start elasticsearch
+sudo systemctl is-active elasticsearch
+# Attendu : active
+
+6. Vérifier son retour — Kibana Dev Tools :
+GET _cat/nodes?v&h=name,ip,node.role
+
+7. Retirer l’exclusion :
+
+S’il existe d’autres exclusions, conserver leur liste au lieu de null.
+PUT _cluster/settings
+{
+  "persistent": {
+    "cluster.routing.allocation.exclude._name": null
+  }
+}
+
+8. Vérifier la stabilisation du cluster :
+GET _cat/allocation?v&h=node,shards,disk.percent,disk.avail
+
+GET _cluster/health?wait_for_status=green&wait_for_no_relocating_shards=true&wait_for_no_initializing_
+
+_______________________________________________________________________________________________________
+
 
  FS=$(findmnt -rn -o TARGET -t ext2,ext3,ext4,xfs,btrfs); echo "$FS"
 
